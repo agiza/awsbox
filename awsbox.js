@@ -297,6 +297,7 @@ verbs['create'] = function(args) {
     })
     .describe('t', 'Instance type, dictates VM speed and cost.  i.e. t1.micro or m1.large (see http://aws.amazon.com/ec2/instance-types/)')
     .default('t', 't1.micro')
+    .describe('tag', 'Tag the instance with these tags (provide key=value pairs)')
     .describe('g', 'security group name, finds or creates a security group with this name')
     .describe('userData', 'opaque instance user data')
     .describe('p', 'public SSL key (installed automatically when provided)')
@@ -333,10 +334,36 @@ verbs['create'] = function(args) {
     process.exit(0);
   }
 
+  // turn these options into an array (if they are specified)
+  ['tag'].forEach(function(key) {
+    if ( key in opts ) {
+      if ( typeof opts[key] === 'string' ) {
+        opts[key] = [ opts[key] ];
+      }
+    }
+    else {
+      opts[key] = [];
+    }
+  });
+
+  // turn any tags into either "key=value" pairs or "key=true" if there is no value
+  var tag = {};
+  opts.tag.forEach(function(val) {
+      if ( val.indexOf('=') === -1 ) {
+          tag[val] = 'true';
+      }
+      else {
+          var split = val.split('=');
+          tag[split[0]] = split[1];
+      }
+  });
+  opts.tag = tag;
+
   var name = opts.n || "noname";
   validateName(name);
   var hostname =  name;
   var longName = process.env['USER'] + "'s awsbox deployment (" + name + ')';
+  opts.Name = longName;
 
   console.log("reading .awsbox.json");
 
@@ -381,10 +408,13 @@ verbs['create'] = function(args) {
         dns.updateRecord(dnsHost, deets.ipAddress, function(err) {
           checkErr(err ? 'updating DNS: ' + err : err);
 
-          console.log("   ... Instance ready, setting human readable name in aws");
-          vm.setName(r.instanceId, longName, function(err) {
+          console.log("   ... Instance ready, setting name and tags on EC2 instance");
+
+          vm.setTags(r.instanceId, opts.tag, function(err) {
             checkErr(err);
-            console.log("   ... name set, waiting for ssh access and configuring");
+
+            console.log("   ... name and tags set, waiting for ssh access and configuring");
+
             var config = { public_url: (opts.u || "http://" + deets.ipAddress) };
 
             if (opts.x) {

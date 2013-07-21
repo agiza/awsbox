@@ -334,6 +334,14 @@ verbs['create'] = function(args) {
     process.exit(0);
   }
 
+  // turn any AWSBOX and AWSBOX_* env vars into tags
+  var tag = {};
+  Object.keys(process.env).filter(function(key) {
+    if ( 'AWSBOX' === key.substr(0, 6) ) {
+      tag[key] = process.env[key];
+    }
+  });
+
   // turn these options into an array (if they are specified)
   ['tag'].forEach(function(key) {
     if ( key in opts ) {
@@ -347,7 +355,6 @@ verbs['create'] = function(args) {
   });
 
   // turn any tags into either "key=value" pairs or "key=true" if there is no value
-  var tag = {};
   opts.tag.forEach(function(val) {
       if ( val.indexOf('=') === -1 ) {
           tag[val] = 'true';
